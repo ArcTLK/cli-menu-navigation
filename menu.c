@@ -2,9 +2,19 @@
 
 #ifdef _WIN32
 	#include <conio.h>
+	#define UP 72
+	#define DOWN 80
+	#define LEFT 75
+	#define RIGHT 77
+	#define CTRLKEY 0xE0
 #elif __linux__
 	#include <termios.h>
 	#include <unistd.h>
+	#define UP 'A'
+	#define DOWN 'B'
+	#define LEFT 'D'
+	#define RIGHT 'C'
+	#define CTRLKEY '\033'
 	int getch() {
 		struct termios oldattr, newattr;
 		int ch;
@@ -45,7 +55,9 @@ void startProcess() {
 	Menu menu;
 	Node* currentMenu;
 	Node* currentSubMenu;
-	char input;
+	int input = '\0';
+	int inputKey;
+	int subMenuWasOpen = 0;
 	generateMenu(&menu);
 	currentMenu = menu.head;
 	currentSubMenu = NULL;
@@ -60,9 +72,42 @@ void startProcess() {
 		printf("Use arrow keys to navigate the menu (X to exit)\n"
 			"You can also use the first letter of each menu to jump to it\n\n");
 		displayMenu(&menu, currentMenu, currentSubMenu);
-		
-		if ((input = getch()) == 'X') {
-			printf("\nExiting...\n");
+		//showing previous action
+		if (input == 'f' || input == 'F') {
+			printf("\n\nYou jumped to the File sub-menu using the 'F' hotkey.");
+		}
+		else if (input == 'e' || input == 'E') {
+			printf("\n\nYou jumped to the Edit sub-menu using the 'E' hotkey.");
+		}
+		else if (input == 's' || input == 'S') {
+			printf("\n\nYou jumped to the Search sub-menu using the 'S' hotkey.");
+		}
+		else if (input == 'h' || input == 'H') {
+			printf("\n\nYou jumped to the Help sub-menu using the 'H' hotkey.");
+		}
+		else if (input == CTRLKEY && inputKey == UP) {
+			if  (currentSubMenu != NULL) printf("\n\nYou pressed the UP arrow key moving from %s to %s.", currentSubMenu->next->data, currentSubMenu->data);
+			else printf("\n\nYou pressed the UP arrow key, but nothing happened as no sub-menu was open.");
+		}
+		else if (input == CTRLKEY && inputKey == DOWN) {
+			if (subMenuWasOpen) printf("\n\nYou pressed the DOWN arrow key moving from %s to %s.", currentSubMenu->prev->data, currentSubMenu->data);
+			else {
+				subMenuWasOpen = 1;
+				printf("\n\nYou pressed the DOWN arrow key opening the %s sub-menu.", currentMenu->data);
+			}
+		}
+		else if (input == CTRLKEY && inputKey == LEFT) {
+			printf("\n\nYou pressed the LEFT arrow key moving from %s to %s.", currentMenu->next->data, currentMenu->data);
+		}
+		else if (input == CTRLKEY && inputKey == RIGHT) {
+			printf("\n\nYou pressed the RIGHT arrow key moving from %s to %s.", currentMenu->prev->data, currentMenu->data);
+		}
+		else if (input != '\0') { //first loop run
+			printf("\n\nSorry, you seemed to have typed an invalid character (Entered: %c).", input);
+		}
+		//process new input
+		if ((input = getch()) == 'X' || input == 'x') {
+			printf("\n\nExiting...\n");
 		}
 		else if (input == 'f' || input == 'F') {
 			currentMenu = menu.head;
@@ -80,44 +125,34 @@ void startProcess() {
 			currentMenu = menu.head->next->next->next;
 			currentSubMenu = *(menu.subMenuHeads + currentMenu->id);
 		}
-		#ifdef _WIN32
-		else switch(getch()) { //get arrow key
-			case 72: //up
-				if (currentSubMenu != NULL) currentSubMenu = currentSubMenu->prev;
-				break;
-			case 80: //down
-				currentSubMenu = currentSubMenu == NULL ? *(menu.subMenuHeads + currentMenu->id) : currentSubMenu->next;
-				break;
-			case 77: //right
-				currentMenu = currentMenu->next;
-				currentSubMenu = NULL;
-				break;
-			case 75: //left
-				currentMenu = currentMenu->prev;
-				currentSubMenu = NULL;
-				break;
-		}
-		#elif __linux__
-		else if (input == '\033') { //control key
-			getch(); //skip '['
-			switch(getch()) { //get arrow key
-				case 'A': //up
+		else if (input == CTRLKEY){
+			#ifdef __linux__
+				/*
+				 * Linux assigns 3 characters for each arrow key.
+				 * The first one is the control key. Second is '['. 
+				 * The third character (A/B/C/D) differentiates the arrow keys.
+				 * */
+				getch(); //skip '['
+			#endif
+			switch(inputKey = getch()) { //get arrow key
+				case UP:
 					if (currentSubMenu != NULL) currentSubMenu = currentSubMenu->prev;
 					break;
-				case 'B': //down
+				case DOWN:
 					currentSubMenu = currentSubMenu == NULL ? *(menu.subMenuHeads + currentMenu->id) : currentSubMenu->next;
 					break;
-				case 'C': //right
+				case RIGHT:
 					currentMenu = currentMenu->next;
 					currentSubMenu = NULL;
+					subMenuWasOpen = 0;
 					break;
-				case 'D': //left
+				case LEFT:
 					currentMenu = currentMenu->prev;
 					currentSubMenu = NULL;
+					subMenuWasOpen = 0;
 					break;
 			}
 		}
-		#endif
 	} while (input != 'X' && input != 'x');
 }
 
